@@ -1,0 +1,68 @@
+import Vue from 'vue'
+import PopupWindow from './PopupWindow.vue';
+
+let instances = [];
+let seed = 1;
+
+// 将弹窗实体添加到document中,优先添加到v-app标签下，否则添加在body下
+// function AppendToDocument (el) {
+//     let appNodes = document.getElementsByClassName('v-application');
+//     let pNode = appNodes.length > 0 ? appNodes[0] : document.body;
+//     pNode.appendChild(el);
+// }
+// 将弹窗实体从document中移除
+// function RemoveFromDocument(el) {
+//     let appNodes = document.getElementsByClassName('v-application');
+//     let pNode = appNodes.length > 0 ? appNodes[0] : document.body;
+//     pNode.removeChild(el);
+// }
+
+const WindowManager = function (options) {
+    options = options || {};
+    let id = options.id || 'window_' + seed++;
+    if (typeof options === 'string') {
+        options = {
+            title: '',
+            src: options
+        };
+    }
+    options.id = id;
+    // 删除可能存在的同id对象
+    WindowManager.close(options);
+    // 实例化一个新对象
+    let WindowConstructor = Vue.extend(PopupWindow);
+    let instance = new WindowConstructor({
+        propsData: options,
+        parent: this // 不加parent，此对象将成为一个根实例。使子类无法正常使用在父类注册的一些vuetify组件
+    });
+    instance.$mount();
+    // AppendToDocument(instance.$el);
+    instance.parent = this ? this.$el : this;
+    this && this.$el ? this.$el.appendChild(instance.$el) : document.body.appendChild(instance.$el);
+    instance.Show();
+    let close = instance.Close;
+    instance.Close = () => close(() => WindowManager.close(id));
+    instances.push(instance);
+    return instances;
+}
+
+WindowManager.close = function (option) {
+    let id = typeof option === 'string' ? option : option.id;
+    let index = instances.findIndex(instance => instance.id === id);
+    if (index > -1) {
+        let instance = instances[index];
+        instance.$destroy();
+        // let $el = instance.$el;
+        // RemoveFromDocument($el);
+        instance.parent && instance.parent.removeChild ? instance.parent.removeChild(instance.$el) : document.body.removeChild(instance.$el);
+        instances.splice(index, 1);
+    }
+}
+
+WindowManager.closeAll = function () {
+    for (let i = instances.length - 1; i >= 0; i--) {
+        instances[i].Close();
+    }
+};
+
+export default WindowManager;
